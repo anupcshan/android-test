@@ -22,6 +22,7 @@ import contextlib
 import json
 import logging
 import os
+import platform
 import re
 import shutil
 import signal
@@ -501,9 +502,11 @@ class EmulatedDevice(object):
 
   def _ExtractTarEntry(self, archive, entry, working_dir):
     """Extracts a single entry from a compressed tar archive."""
-    subprocess.check_call([
-        'tar', '-xzSf', archive, '--no-same-owner',
-        '-C', working_dir, entry])
+    cmd = ['tar', '-xzSf', archive, '--no-same-owner', '-C', working_dir]
+    if platform.system() != "Darwin":
+        cmd += ['--no-anchored']
+    cmd += [entry]
+    subprocess.check_call(cmd)
 
   def _StageDataFiles(self,
                       system_image_dir,
