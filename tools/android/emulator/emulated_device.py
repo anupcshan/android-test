@@ -1458,11 +1458,11 @@ class EmulatedDevice(object):
           ramdisk_adbd.write(adbd_bytes)
           ramdisk_adbd.flush()
     find_proc = subprocess.Popen(
-        ['find', '.', '-mindepth', '1', '-printf', '%P\n'],
+        ['find', '.', '-mindepth', '1', '-print'],
         cwd=exploded_temp,
         stdout=subprocess.PIPE)
     create_cpio_proc = subprocess.Popen(
-        ['cpio', '--create', '--format', 'newc', '--owner', '0:0'],
+        ['cpio', '-o', '--format', 'newc', '-R', '0:0'],
         cwd=exploded_temp,
         stdin=find_proc.stdout,
         stdout=subprocess.PIPE)
