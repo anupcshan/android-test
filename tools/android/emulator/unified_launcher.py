@@ -21,6 +21,7 @@ import ConfigParser
 import json
 import logging
 import os
+import platform as plat
 import StringIO
 import subprocess
 import sys
@@ -988,6 +989,10 @@ def _MakeAndroidPlatform():
       platform.adb = resources.GetResourceFilename(turbo_g3_relative)
   assert os.path.exists(platform.adb), ('%s: does not exist. please pass '
                                         '--adb_turbo' % platform.adb)
+  if plat.system() == "Darwin":
+    # adb.turbo is an ELF binary, won't run on Mac. Fall back to using
+    # adb from platform-tools.
+    platform.adb = FLAGS.adb
   platform.real_adb = FLAGS.adb
 
   if FLAGS.flag_configured_android_tools:

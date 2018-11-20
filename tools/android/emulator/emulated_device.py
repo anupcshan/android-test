@@ -2489,7 +2489,8 @@ class EmulatedDevice(object):
           qemu_args.extend(['-append', 'nopat'])
         # TODO: pass an appropriate value for -cpu when
         # KVM snapshot migrations are a reality (again.)
-      else:
+      elif not self._IsRunningOnMac():
+        # TODO(anupc): Don't blindly ignore disable-kvm. Fix kvm_present check to handle Macs.
         qemu_args.append('-disable-kvm')
     return qemu_args
 
@@ -3062,7 +3063,10 @@ class EmulatedDevice(object):
     # those files before we are really shutdown.
     # Hopefully with v2 design, we don't have to fork.
     all_files_closed = False
-    lsof_command = ['/usr/bin/lsof'] + image_files
+    lsof_command = ['/usr/bin/lsof']
+    if self._IsRunningOnMac():
+      lsof_command = ['/usr/sbin/lsof']
+    lsof_command += image_files
     # Wait for 10 seconds before giving up.
     for _ in range(10):
       try:
