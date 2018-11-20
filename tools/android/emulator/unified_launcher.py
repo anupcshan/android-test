@@ -796,7 +796,7 @@ def _HashFiles(files):
     return {}
 
   hashes_to_files = collections.OrderedDict()
-  for line in subprocess.check_output(['sha1sum'] + files).split('\n'):
+  for line in subprocess.check_output(['shasum', '-a', '1'] + files).split('\n'):
     if line:
       hash_and_file = line.split()
       hashes_to_files[hash_and_file[0]] = hash_and_file[1]
