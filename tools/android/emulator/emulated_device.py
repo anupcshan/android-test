@@ -496,7 +496,8 @@ class EmulatedDevice(object):
       dst: the destination file
     """
     subprocess.check_call(
-        ['cp', '--sparse=always', '--dereference', src, dst])
+        # Efficient file copy with sparse awareness on Mac/Linux.
+        ['rsync', '--copy-links', '--sparse', src, dst])
 
   def _ExtractTarEntry(self, archive, entry, working_dir):
     """Extracts a single entry from a compressed tar archive."""
