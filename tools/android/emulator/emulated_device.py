@@ -389,6 +389,11 @@ class EmulatedDevice(object):
     with open(build_prop, 'r') as f:
       return 'ro.build.version.incremental=2424746\n' in f.read()
 
+  def _IsRunningOnMac(self):
+    """Check if we're running on a Mac host"""
+
+    return platform.system() == "Darwin"
+
   def _IsPipeTraversalRunning(self):
     if self._pipe_traversal_running is None:
       if self._SnapshotPresent().value == 'True':
@@ -503,7 +508,7 @@ class EmulatedDevice(object):
   def _ExtractTarEntry(self, archive, entry, working_dir):
     """Extracts a single entry from a compressed tar archive."""
     cmd = ['tar', '-xzSf', archive, '--no-same-owner', '-C', working_dir]
-    if platform.system() != "Darwin":
+    if not self._IsRunningOnMac():
         cmd += ['--no-anchored']
     cmd += [entry]
     subprocess.check_call(cmd)
@@ -593,7 +598,9 @@ class EmulatedDevice(object):
     # Pipe service won't work for user build and api level 23+, since
     # pipe_traversal doesn't have a right seclinux policy. In this case, just
     # use real adb.
-    self._use_real_adb = (
+    # Also, pipe_traversal is currently built for X86 Linux and won't run on
+    # a Mac.
+    self._use_real_adb = self._IsRunningOnMac() or (
         self._IsUserBuild(build_prop_path) and self.GetApiVersion() >= 23)
 
     if userdata_tarball:
@@ -1876,7 +1883,9 @@ class EmulatedDevice(object):
     sys.stderr = open(os.path.join(watchdog_dir, 'watchdog.err'), 'w+b', 0)
     pipe_service_processes = self._StartPipeServices(pipe_dir)
     tn_pipe_service_process = self._StartTelnetPipeServices(pipe_dir)
-    if self._display:
+
+    # Cannot launch xvfb on Mac
+    if self._display and not self._IsRunningOnMac():
       # Try starting the Xserver three times before giving up.
       for _ in range(3):
         try:
@@ -1980,7 +1989,6 @@ class EmulatedDevice(object):
     # will fallback to real adb. We run a fake pipe_service here
     # so we don't need to add a few if/else branch elsewhere.
     if self._use_real_adb:
-      args = ['sleep', '365d']
       return [subprocess.Popen(['sleep', '365d'])]
     else:
       pipes = []
@@ -2044,6 +2052,11 @@ class EmulatedDevice(object):
         '--external_addr=tcp:localhost:%d' % self.emulator_telnet_port,
         '--relay_addr=unix-listen:qemu.mgmt',
         '--frame_relay']
+
+    if self._use_real_adb:
+      args = ['sleep', '365d']
+      return subprocess.Popen(['sleep', '365d'])
+
     return subprocess.Popen(
         args,
         stdin=open('/dev/null'),
