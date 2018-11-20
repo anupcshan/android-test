@@ -503,7 +503,7 @@ class EmulatedDevice(object):
     """Extracts a single entry from a compressed tar archive."""
     subprocess.check_call([
         'tar', '-xzSf', archive, '--no-same-owner',
-        '-C', working_dir, '--no-anchored', entry])
+        '-C', working_dir, entry])
 
   def _StageDataFiles(self,
                       system_image_dir,
