@@ -700,7 +700,11 @@ public class AdbController {
       }
     }
 
-    makeAdbCall("logcat", "-b", Joiner.on(',').join(buffers).toLowerCase(), "-c");
+    try {
+      makeAdbCall("logcat", "-b", Joiner.on(',').join(buffers).toLowerCase(), "-c");
+    } catch (IllegalStateException ignored) {
+      // Ignored
+    }
     LogcatStreamer streamer =
         new LogcatStreamer(
             prefixArgsWithDeviceSerial(),
