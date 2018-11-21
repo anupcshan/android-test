@@ -143,6 +143,7 @@ class InstrumentationRepository {
 
     if (!Strings.isNullOrEmpty(testCollectorInstrumentationPackage)) {
       testCollectorRunner = findInstrumentation(testCollectorInstrumentationPackage, availableInstrumentations, filteredInstrumentations);
+      logger.info("Located test collector instrumentation class: " + testCollectorRunner.getFullName());
     }
   }
 
@@ -202,7 +203,7 @@ class InstrumentationRepository {
       }
     }
     if (result != null) {
-      logger.info("Using bootstrap instrumentation class: " + result.getFullName());
+      logger.info("Using instrumentation class: " + result.getFullName());
       return result;
     }
     throw new RuntimeException(
