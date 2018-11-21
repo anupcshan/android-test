@@ -136,16 +136,17 @@ public class AndroidDeviceTestSuite {
       Map<String, String> deviceEnvVars;
       String externalStorageDirectory;
       String stackTraceFile;
-      Instrumentation testInstrumentation;
+      Instrumentation testInstrumentation, testCollectorInstrumentation;
       brokeredDevice = myBroker.leaseDevice();
 
       AdbController controller = brokeredDevice.getAdbController();
       testInstrumentation = controller.getGoogleTestInstrumentation();
+      testCollectorInstrumentation = controller.getTestCollectorInstrumentation();
       deviceEnvVars = brokeredDevice.getShellVariables();
       externalStorageDirectory = deviceEnvVars.get("EXTERNAL_STORAGE");
       stackTraceFile = controller.getDeviceProperties().get("dalvik.vm.stack-trace-file");
       checkNotNull(externalStorageDirectory, "No external storage on device? %s", deviceEnvVars);
-      nativeTestList = listTests(brokeredDevice, controller, testInstrumentation);
+      nativeTestList = listTests(brokeredDevice, controller, testInstrumentation, testCollectorInstrumentation);
 
       TestSuite nativeSuiteRoot = new TestSuite();
 
@@ -198,8 +199,15 @@ public class AndroidDeviceTestSuite {
     List<InfoPb> listTests(
         BrokeredDevice brokeredDevice,
         AdbController controller,
-        Instrumentation testInstrumentation) {
-      TestSuitePb testSuite = controller.getTestMethods(testInstrumentation);
+        Instrumentation testInstrumentation,
+        Instrumentation testCollectorInstrumentation) {
+      TestSuitePb testSuite;
+      if (testCollectorInstrumentation != null) {
+        testSuite = controller.getTestsViaCollector(testCollectorInstrumentation);
+      } else {
+        testSuite = controller.getTestMethods(testInstrumentation);
+      }
+
       List<InfoPb> sortedTests = TestSuitePbUtil.sortTestSuite(testSuite).getInfoList();
       List<InfoPb> filteredTests = Lists.newArrayList();
       for (InfoPb testInfo : sortedTests) {

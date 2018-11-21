@@ -30,6 +30,7 @@ import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.Ign
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.InstallBasicServices;
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.ScanTargetPackageForTests;
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.SkipCoverageFilesCheck;
+import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.TestCollectorInstrumentationPackage;
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.TestTimeoutOverride;
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.UniquePort;
 import com.google.android.apps.common.testing.broker.LogcatFilter.Level;
@@ -37,6 +38,7 @@ import com.google.android.apps.common.testing.broker.LogcatStreamer.Buffer;
 import com.google.android.apps.common.testing.broker.LogcatStreamer.OutputFormat;
 import com.google.android.apps.common.testing.broker.SubprocessCommunicator.Builder;
 import com.google.android.apps.common.testing.broker.shell.ShellUtils;
+import com.google.android.apps.common.testing.proto.TestInfo.InfoPb;
 import com.google.android.apps.common.testing.proto.TestInfo.TestSuitePb;
 import com.google.common.annotations.Beta;
 import com.google.common.annotations.VisibleForTesting;
@@ -58,6 +60,7 @@ import com.google.inject.Provider;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -175,7 +178,8 @@ public class AdbController {
       List<String> assumeApksInstalled,
       List<String> additionalTestPackages,
       List<String> ignoreTestPackages,
-      String bootstrapInstrumentationPackage) {
+      String bootstrapInstrumentationPackage,
+      String testCollectorInstrumentationPackage) {
     this.portPicker = checkNotNull(portPicker);
     this.communicatorBuilderProvider = checkNotNull(communicatorBuilderProvider);
     this.device = checkNotNull(device);
@@ -197,6 +201,7 @@ public class AdbController {
             .withAdditionalTestPackages(additionalTestPackages)
             .withIgnoreTestPackages(ignoreTestPackages)
             .withBootstrapInstrumentationPackage(bootstrapInstrumentationPackage)
+            .withTestCollectorInstrumentationPackage(testCollectorInstrumentationPackage)
             .build();
   }
 
@@ -899,6 +904,7 @@ public class AdbController {
     private final List<String> additionalTestPackages;
     private final List<String> ignoreTestPackages;
     private final String bootstrapInstrumentationPackage;
+    private final String testCollectorInstrumentationPackage;
 
     @Inject
     FullControlAdbControllerFactory(
@@ -917,7 +923,8 @@ public class AdbController {
         @AssumeApksInstalled List<String> assumeApksInstalled,
         @AdditionalTestPackages List<String> additionalTestPackages,
         @IgnoreTestPackages List<String> ignoreTestPackages,
-        @BootstrapInstrumentationPackage String bootstrapInstrumentationPackage) {
+        @BootstrapInstrumentationPackage String bootstrapInstrumentationPackage,
+        @TestCollectorInstrumentationPackage String testCollectorInstrumentationPackage) {
       this.portPicker = portPicker;
       this.communicatorBuilderProvider = communicatorBuilderProvider;
       this.instrumentationListProcessorProvider = instrumentationListProcessorProvider;
@@ -934,6 +941,7 @@ public class AdbController {
       this.ignoreTestPackages = ignoreTestPackages;
       this.additionalTestPackages = additionalTestPackages;
       this.bootstrapInstrumentationPackage = bootstrapInstrumentationPackage;
+      this.testCollectorInstrumentationPackage = testCollectorInstrumentationPackage;
     }
 
     @Override
@@ -955,7 +963,8 @@ public class AdbController {
           assumeApksInstalled,
           additionalTestPackages,
           ignoreTestPackages,
-          bootstrapInstrumentationPackage);
+          bootstrapInstrumentationPackage,
+          testCollectorInstrumentationPackage);
     }
   }
 
@@ -1014,6 +1023,58 @@ public class AdbController {
     return suitePb;
   }
 
+  public TestSuitePb getTestsViaCollector(Instrumentation testCollectorInstrumentation) {
+    List<String> adbArgs = Lists.newArrayList();
+
+    adbArgs.add("am");
+    adbArgs.add("instrument");
+
+    adbArgs.addAll(
+      Lists.newArrayList(
+        "-r",
+        "-w",
+        testCollectorInstrumentation.getFullName()));
+
+    InstrumentationTestRunnerProcessor stdoutProcessor =
+        new InstrumentationTestRunnerProcessor(new EventBus());
+    SimpleLineListProcessor stderrProcessor = new SimpleLineListProcessor();
+    SubprocessCommunicator.Builder builder = communicatorBuilderProvider.get();
+    builder
+        .withStdoutProcessor(stdoutProcessor)
+        .withStderrProcessor(stderrProcessor);
+    String shellArgs = Joiner.on(" ").join(adbArgs);
+
+    List<String> partialArgs = Lists.newArrayList("shell", shellArgs);
+    List<InfoPb> allTests = Lists.newArrayList();
+
+    try {
+      makeCheckedCall(builder,
+          prefixArgsWithDeviceSerial(partialArgs.toArray(new String[partialArgs.size()])),
+          getDefaultTimeout());
+      for (ExecutedTest executedTest : stdoutProcessor.getResult()) {
+        String splits[] = executedTest.getTestClass().split("\\.");
+        allTests.add(InfoPb.newBuilder()
+                        .setTestPackage(Joiner.on(".").join(Arrays.asList(splits).subList(0, splits.length-1)))
+                        .setTestClass(splits[splits.length-1])
+                        .setTestMethod(executedTest.getTestMethod())
+                        .build());
+      }
+    } catch (IllegalStateException e) {
+      StringBuilder allLines = new StringBuilder();
+      for (ExecutedTest executedTest : stdoutProcessor.getResult()) {
+        allLines.append(executedTest.getAllLines());
+      }
+
+      throw new RuntimeException(String.format(
+          "Error when executing adb.\n STDOUT: %s\n STDERR: %s",
+          allLines,
+          Joiner.on("\n").join(stderrProcessor.getResult())), e);
+    }
+
+    logger.info("OUTPUT:" + stdoutProcessor.getResult() + "\nSTDERR:" + stderrProcessor.getResult());
+    return TestSuitePb.newBuilder().addAllInfo(allTests).build();
+  }
+
   private void checkHaveTestInfoFor(String packageName) {
     checkState(testRepo.containsInfoForPackage(packageName),
         "Missing information for: %s. May be caused by left-overs from other tests on same"
@@ -1039,6 +1100,10 @@ public class AdbController {
    */
   public Instrumentation getGoogleTestInstrumentation() {
     return instrumentationRepo.getTestInstrumentation();
+  }
+
+  public Instrumentation getTestCollectorInstrumentation() {
+    return instrumentationRepo.getTestCollectorInstrumentation();
   }
 
   /**

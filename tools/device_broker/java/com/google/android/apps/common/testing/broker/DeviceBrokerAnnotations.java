@@ -85,6 +85,9 @@ final class DeviceBrokerAnnotations {
   @BindingAnnotation @Target({FIELD, METHOD, PARAMETER}) @Retention(RUNTIME)
   public @interface BootstrapInstrumentationPackage {}
 
+  @BindingAnnotation @Target({FIELD, METHOD, PARAMETER}) @Retention(RUNTIME)
+  public @interface TestCollectorInstrumentationPackage {}
+
   @BindingAnnotation
   @Target({FIELD, METHOD, PARAMETER})
   @Retention(RUNTIME)

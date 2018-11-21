@@ -59,6 +59,7 @@ import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.Sim
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.SkipCoverageFilesCheck;
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.SystemApksToInstallFlag;
 import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.TestTimeoutOverride;
+import com.google.android.apps.common.testing.broker.DeviceBrokerAnnotations.TestCollectorInstrumentationPackage;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
@@ -109,6 +110,7 @@ class DeviceBrokerOptions extends AbstractModule {
   private final List<String> additionalTestPackages;
   private final List<String> ignoreTestPackages;
   private final String bootstrapInstrumentationPackage;
+  private final String testCollectorInstrumentationPackage;
   private final List<String> extraCerts;
   private final Boolean enableApkReuse;
   private final List<String> precompiledApksToInstall;
@@ -156,6 +158,7 @@ class DeviceBrokerOptions extends AbstractModule {
     additionalTestPackages = ImmutableList.copyOf(b.additionalTestPackages);
     ignoreTestPackages = ImmutableList.copyOf(b.ignoreTestPackages);
     bootstrapInstrumentationPackage = checkNotNull(b.bootstrapInstrumentationPackage);
+    testCollectorInstrumentationPackage = checkNotNull(b.testCollectorInstrumentationPackage);
     extraCerts = ImmutableList.copyOf(b.extraCerts);
     enableApkReuse = checkNotNull(b.enableApkReuse);
     precompiledApksToInstall = ImmutableList.copyOf(b.precompiledApksToInstall);
@@ -248,6 +251,12 @@ class DeviceBrokerOptions extends AbstractModule {
   @BootstrapInstrumentationPackage
   String provideBootstrap() {
     return bootstrapInstrumentationPackage;
+  }
+
+  @Provides
+  @TestCollectorInstrumentationPackage
+  String provideTestCollector() {
+    return testCollectorInstrumentationPackage;
   }
 
   @Provides
@@ -620,6 +629,26 @@ class DeviceBrokerOptions extends AbstractModule {
 
     Builder withBootstrapInstrumentationPackage(String pkg) {
       this.bootstrapInstrumentationPackage = checkNotNull(pkg);
+      return this;
+    }
+
+    static final String TEST_COLLECTOR_INSTRUMENTATION_PACKAGE_FLAG =
+        "test_collector_instrumentation_package";
+    static final String TEST_COLLECTOR_INSTRUMENTATION_PACKAGE_FLAG_DESC =
+        "The Android package name containing the instrumentation class to use to run the tests. "
+            + "This flag is only needed if there are multiple Android packages containing a  "
+            + "\"GoogleInstrumentationTestRunner\" class. If the test case classes are in a "
+            + "different  package than this one, then this package name should also be specified "
+            + "in the \"ignore_test_packages\" flag.";
+
+    @Parameter(
+      names = "--" + TEST_COLLECTOR_INSTRUMENTATION_PACKAGE_FLAG,
+      description = TEST_COLLECTOR_INSTRUMENTATION_PACKAGE_FLAG_DESC
+    )
+    public String testCollectorInstrumentationPackage = "";
+
+    Builder withTestCollectorInstrumentationPackage(String pkg) {
+      this.testCollectorInstrumentationPackage = checkNotNull(pkg);
       return this;
     }
 

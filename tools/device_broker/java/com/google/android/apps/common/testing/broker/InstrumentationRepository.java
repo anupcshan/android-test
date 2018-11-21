@@ -56,9 +56,11 @@ class InstrumentationRepository {
   private final Provider<List<Instrumentation>> instrumentationsProvider;
   private final List<String> additionalTestPackages;
   private final String bootstrapInstrumentationPackage;
+  private final String testCollectorInstrumentationPackage;
   private final List<String> ignoreTestPackages;
 
   private Instrumentation testRunner;
+  private Instrumentation testCollectorRunner;
   private String defaultTestPackage;
 
   private InstrumentationRepository(Builder builder) {
@@ -66,12 +68,19 @@ class InstrumentationRepository {
     this.additionalTestPackages = builder.additionalTestPackages;
     this.ignoreTestPackages = builder.ignoreTestPackages;
     this.bootstrapInstrumentationPackage = builder.bootstrapInstrumentationPackage;
+    this.testCollectorInstrumentationPackage = builder.testCollectorInstrumentationPackage;
   }
 
   /** @return Instrumentation containing the test runner */
   public Instrumentation getTestInstrumentation() {
     findInstrumentations();
     return testRunner;
+  }
+
+  /** @return Instrumentation containing the test runner */
+  public Instrumentation getTestCollectorInstrumentation() {
+    findInstrumentations();
+    return testCollectorRunner;
   }
 
   /** @return The package name(s) containing the tests. */
@@ -127,9 +136,13 @@ class InstrumentationRepository {
     }
 
     if (!Strings.isNullOrEmpty(bootstrapInstrumentationPackage)) {
-      testRunner = getBootstrapInstrumentation(availableInstrumentations, filteredInstrumentations);
+      testRunner = findInstrumentation(bootstrapInstrumentationPackage, availableInstrumentations, filteredInstrumentations);
     } else {
       testRunner = getFirstInstrumentation(filteredInstrumentations);
+    }
+
+    if (!Strings.isNullOrEmpty(testCollectorInstrumentationPackage)) {
+      testCollectorRunner = findInstrumentation(testCollectorInstrumentationPackage, availableInstrumentations, filteredInstrumentations);
     }
   }
 
@@ -164,16 +177,17 @@ class InstrumentationRepository {
    * @param filteredInstrumentations Supported instrumentations
    * @return the Instrumentation containing the test runner
    */
-  private Instrumentation getBootstrapInstrumentation(
+  private Instrumentation findInstrumentation(
+      String toFind,
       List<Instrumentation> availableInstrumentations,
       List<Instrumentation> filteredInstrumentations) {
     Instrumentation result = null;
-    if (bootstrapInstrumentationPackage.contains("/")) {
+    if (toFind.contains("/")) {
       // The flag specified the full package and class names so use both for comparison.
       // Since the user was specific with the test runner name, scan all available
       // instrumentations.
       for (Instrumentation instrumentation : availableInstrumentations) {
-        if (bootstrapInstrumentationPackage.equals(instrumentation.getFullName())) {
+        if (toFind.equals(instrumentation.getFullName())) {
           result = instrumentation;
           break;
         }
@@ -181,7 +195,7 @@ class InstrumentationRepository {
     } else {
       // The flag only specified the package name, so only compare the package name part.
       for (Instrumentation instrumentation : filteredInstrumentations) {
-        if (bootstrapInstrumentationPackage.equals(instrumentation.getAndroidPackage())) {
+        if (toFind.equals(instrumentation.getAndroidPackage())) {
           result = instrumentation;
           break;
         }
@@ -205,6 +219,7 @@ class InstrumentationRepository {
     private List<String> additionalTestPackages = Collections.emptyList();
     private List<String> ignoreTestPackages = Collections.emptyList();
     private String bootstrapInstrumentationPackage;
+    private String testCollectorInstrumentationPackage;
 
     Builder() {}
 
@@ -225,6 +240,11 @@ class InstrumentationRepository {
 
     Builder withBootstrapInstrumentationPackage(String bootstrapInstrumentationPackage) {
       this.bootstrapInstrumentationPackage = bootstrapInstrumentationPackage;
+      return this;
+    }
+
+    Builder withTestCollectorInstrumentationPackage(String testCollectorInstrumentationPackage) {
+      this.testCollectorInstrumentationPackage = testCollectorInstrumentationPackage;
       return this;
     }
 
